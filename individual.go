@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"math"
 )
 
@@ -18,6 +19,7 @@ type gene struct {
 // Mutate replaces function, constant or connections of a Gene with a random
 // valid value
 func (g *gene) Mutate(position int, options *CGPOptions) {
+
 	toMutate := options.Rand.Intn(2 + len(g.Connections))
 
 	if toMutate == 0 {
@@ -37,13 +39,12 @@ func (g *gene) Mutate(position int, options *CGPOptions) {
 // function genes and output genes and can hold the fitness of the evolved
 // program.
 type Individual struct {
-	Genes   []gene      // The function genes
-	Outputs []int       // The output genes
-	Options *CGPOptions // A pointer to the CGPOptions. Necessary to retrieve e.g. the mutation rate.
-	Fitness float64     // The fitness of the individual
-
-	activeGenes []bool // Which genes are active (contribute to program output)
-	cacheID     string // Programs with the same CacheID will behave identically
+	Genes       []gene      // The function genes
+	Outputs     []int       // The output genes
+	Options     *CGPOptions // A pointer to the CGPOptions. Necessary to retrieve e.g. the mutation rate.
+	Fitness     float64     // The fitness of the individual
+	activeGenes []bool      // Which genes are active (contribute to program output)
+	cacheID     string      // Programs with the same CacheID will behave identically
 }
 
 // NewIndividual creates a random valid program with the options as specified.
@@ -108,10 +109,16 @@ func (ind *Individual) markActive(gene int) {
 	}
 
 	ind.activeGenes[gene] = true
+	//TODO - only mark num arity conns active?
+	//for _, conn := range ind.Genes[gene-ind.Options.NumInputs].Connections {
+	//	ind.markActive(conn)
+	//}
 
-	for _, conn := range ind.Genes[gene-ind.Options.NumInputs].Connections {
-		ind.markActive(conn)
+	arity := ind.Options.FunctionList[ind.Genes[gene-ind.Options.NumInputs].Function].Arity
+	for i := 0; i < arity; i++ {
+		ind.markActive(ind.Genes[gene-ind.Options.NumInputs].Connections[i])
 	}
+
 }
 
 func (ind *Individual) determineActiveGenes() {
@@ -120,8 +127,8 @@ func (ind *Individual) determineActiveGenes() {
 		return
 	}
 
-	ind.activeGenes = make([]bool,
-		ind.Options.NumInputs+ind.Options.NumGenes+ind.Options.NumOutputs)
+	//MCC ind.activeGenes = make([]bool, ind.Options.NumInputs+ind.Options.NumGenes+ind.Options.NumOutputs)
+	ind.activeGenes = make([]bool, ind.Options.NumInputs+ind.Options.NumGenes)
 
 	// Mark inputs as Active
 	for i := 0; i < ind.Options.NumInputs; i++ {
@@ -188,8 +195,13 @@ func (ind Individual) Run(input []float64) []float64 {
 			functionInput[j+1] = nodeOutput[c]
 		}
 
-		functionOutput := ind.Options.FunctionList[ind.Genes[i].Function](functionInput)
+		functionOutput := ind.Options.FunctionList[ind.Genes[i].Function].Eval(functionInput)
+		if math.IsNaN(functionOutput) {
+			ind.Genes[i].Function = 0
+			functionOutput = ind.Options.FunctionList[ind.Genes[i].Function].Eval(functionInput)
+		}
 		nodeOutput[i+ind.Options.NumInputs] = functionOutput
+
 	}
 
 	output := make([]float64, 0, ind.Options.NumOutputs)
@@ -198,4 +210,110 @@ func (ind Individual) Run(input []float64) []float64 {
 	}
 
 	return output
+}
+
+func (ind Individual) parse(result string, index int) string {
+
+	if index < ind.Options.NumInputs {
+		result += fmt.Sprintf("x%d", index)
+		return result
+	}
+
+	name := ind.Options.FunctionList[ind.Genes[index-ind.Options.NumInputs].Function].Name
+	arity := ind.Options.FunctionList[ind.Genes[index-ind.Options.NumInputs].Function].Arity
+	conn := ind.Genes[index-ind.Options.NumInputs].Connections
+
+	if name == "const" {
+
+		result += fmt.Sprintf("%f", ind.Genes[index-ind.Options.NumInputs].Constant)
+
+	} else if name == "add" {
+
+		result += "("
+		result = ind.parse(result, conn[0])
+		for i := 1; i < arity; i++ {
+			result += "+"
+			result = ind.parse(result, conn[i])
+		}
+		result += ")"
+
+	} else if name == "sub" {
+
+		result += "("
+		result = ind.parse(result, conn[0])
+		for i := 1; i < arity; i++ {
+			result += "-"
+			result = ind.parse(result, conn[i])
+		}
+		result += ")"
+
+	} else if name == "mul" {
+
+		result += "("
+		result = ind.parse(result, conn[0])
+		for i := 1; i < arity; i++ {
+			result += "*"
+			result = ind.parse(result, conn[i])
+		}
+		result += ")"
+
+	} else if name == "div" {
+
+		result += "("
+		result = ind.parse(result, conn[0])
+		for i := 1; i < arity; i++ {
+			result += "/"
+			result = ind.parse(result, conn[i])
+		}
+		result += ")"
+	} else {
+
+		result += fmt.Sprintf("%s(", name)
+		for i := 0; i < arity; i++ {
+			result = ind.parse(result, conn[i])
+			if i < arity-1 {
+				result += ","
+			}
+		}
+		result += ")"
+	}
+	return result
+}
+
+// Expr -
+func (ind Individual) Expr() string {
+
+	ind.determineActiveGenes()
+	/*
+		for i := 0; i < ind.Options.NumInputs; i++ {
+			fmt.Printf("%d: x%d \n", i, i)
+		}
+
+		for i := 0; i < ind.Options.NumGenes; i++ {
+			if ind.activeGenes[ind.Options.NumInputs+i] {
+				name := ind.Options.FunctionList[ind.Genes[i].Function].Name
+				fmt.Printf("%d: %s %v %f active=%v\n", ind.Options.NumInputs+i, name, ind.Genes[i].Connections, ind.Genes[i].Constant, ind.activeGenes[ind.Options.NumInputs+i])
+			}
+		}
+
+		for i, conn := range ind.Outputs {
+			fmt.Printf("output%d: %d \n", i, conn)
+		}
+	*/
+	result := ""
+
+	for o := 0; o < ind.Options.NumOutputs; o++ {
+		result += "\n"
+		if ind.Options.NumInputs == 0 {
+			result += "f()="
+		} else {
+			result += fmt.Sprintf("f%d(x0", o)
+			for i := 1; i < ind.Options.NumInputs; i++ {
+				result += fmt.Sprintf(",x%d", i)
+			}
+			result += fmt.Sprintf(")=")
+		}
+		result = ind.parse(result, ind.Outputs[o])
+	}
+	return result
 }

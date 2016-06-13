@@ -1,7 +1,7 @@
 package cgp_test
 
 import (
-	"github.com/DataWraith/cgp"
+	"github.com/markcheno/cgp"
 	"math/rand"
 	"testing"
 )
@@ -27,15 +27,19 @@ func TestReverseInputs(t *testing.T) {
 	// value is the constant that evolved for the function, the others come
 	// from the maxArity inputs to the function.
 	options.FunctionList = []cgp.CGPFunction{
-		// pass through input A
-		func(input []float64) float64 {
+		// pass through input 1
+		{"pass1", 2, func(input []float64) float64 {
 			return input[1]
-		},
+		}},
 
-		// pass through input B
-		func(input []float64) float64 {
+		// pass through input 2
+		{"pass2", 2, func(input []float64) float64 {
 			return input[2]
-		},
+		}},
+		// pass through input 3
+		//{"pass3", 1, func(input []float64) float64 {
+		//	return input[3]
+		//}},
 	}
 
 	// The evaluator punishes every mistake with +1 fitness (0 is perfect
@@ -45,13 +49,13 @@ func TestReverseInputs(t *testing.T) {
 		fitness := 0.0
 		outputs := ind.Run([]float64{1, 2, 3})
 		if outputs[0] != 3 {
-			fitness += 1
+			fitness++
 		}
 		if outputs[1] != 2 {
-			fitness += 1
+			fitness++
 		}
 		if outputs[2] != 1 {
-			fitness += 1
+			fitness++
 		}
 		return fitness
 	}
@@ -73,6 +77,7 @@ func TestReverseInputs(t *testing.T) {
 	for gp.Population[0].Fitness > 0 {
 		gp.RunGeneration()
 	}
+	t.Log(gp.Population[0].Expr())
 
 	t.Log("CGP successfully evolved input reversal")
 }

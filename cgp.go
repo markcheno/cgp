@@ -11,7 +11,12 @@ import (
 // A CGPFunction is a function that is usable in a Genetic Program. It takes
 // zero or more parameters and outputs a single result. For example
 // a CGPFunction could implement binary AND or floating point multiplication.
-type CGPFunction func([]float64) float64
+//type CGPFunction func([]float64) float64
+type CGPFunction struct {
+	Name  string
+	Arity int
+	Eval  func([]float64) float64
+}
 
 // The EvalFunction takes one Individual and returns its fitness value.
 type EvalFunction func(Individual) float64
