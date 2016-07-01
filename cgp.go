@@ -37,6 +37,7 @@ type Options struct {
 	NumInputs    int              // The number of Inputs
 	NumOutputs   int              // The number of Outputs
 	MaxArity     int              // The maximum Arity of the CGPFunctions in FunctionList
+	MaxProcs     int              // GOMAXPROCS
 	FunctionList []Function       // The functions used in evolution
 	RandConst    RndConstFunction // The function supplying constants
 	Evaluator    EvalFunction     // The evaluator that assigns a fitness to an individual
@@ -86,6 +87,10 @@ func New(options Options) *CGP {
 		options.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
 
+	if options.MaxProcs == 0 {
+		options.MaxProcs = 2
+	}
+
 	result := &CGP{
 		Options:        options,
 		Population:     make([]Individual, 1, options.PopSize),
@@ -109,7 +114,7 @@ func (cgp *CGP) RunGeneration() {
 	}
 
 	// Evaluate offspring (in parallel)
-	runtime.GOMAXPROCS(2)
+	runtime.GOMAXPROCS(cgp.Options.MaxProcs)
 	var wg sync.WaitGroup
 	for i := 1; i < cgp.Options.PopSize; i++ {
 		wg.Add(1)
@@ -146,7 +151,7 @@ func (cgp *CGP) Solve(maxGens int, fitnessThreshold float64, showProgress bool) 
 		if cgp.Population[0].Fitness < fitness {
 			fitness = cgp.Population[0].Fitness
 			if showProgress {
-				fmt.Printf("gen: %d, fitness: %f, %s\n", gens, cgp.Population[0].Fitness, cgp.Population[0].Expr())
+				fmt.Printf("expr='%s' # gen: %d, fitness: %f\n", cgp.Population[0].Expr(), gens, cgp.Population[0].Fitness)
 			}
 		}
 		if cgp.Population[0].Fitness <= fitnessThreshold {

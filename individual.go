@@ -262,12 +262,12 @@ func (ind *Individual) Expr() string {
 	result := ""
 
 	for o := 0; o < ind.Options.NumOutputs; o++ {
-		result += "\n"
-		result += fmt.Sprintf("f%d(x0", o)
-		for i := 1; i < ind.Options.NumInputs; i++ {
-			result += fmt.Sprintf(",x%d", i)
-		}
-		result += fmt.Sprintf(")=")
+		//result += "\n"
+		//result += fmt.Sprintf("f%d(x0", o)
+		//for i := 1; i < ind.Options.NumInputs; i++ {
+		//	result += fmt.Sprintf(",x%d", i)
+		//}
+		//result += fmt.Sprintf(")=")
 		result = ind.parse(result, ind.Outputs[o])
 	}
 	return result
